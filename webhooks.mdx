@@ -1,0 +1,280 @@
+---
+title: Webhooks
+description: Set up and manage webhooks for real-time Pattrns notifications
+---
+
+## Webhooks Overview
+
+Webhooks allow Pattrns to send real-time notifications to your applications when specific events occur. This enables you to build responsive integrations that react immediately to changes in your data and patterns.
+
+<Callout kind="info">Webhooks deliver events as HTTP POST requests to URLs you specify, containing JSON payloads with event details.</Callout>
+
+## Setting Up Webhooks
+
+Configure webhooks through your Pattrns dashboard or programmatically via the API.
+
+<Steps>
+  <Step title="Access Webhook Settings" icon="settings">
+    Navigate to the Webhooks section in your Pattrns dashboard.
+  </Step>
+  <Step title="Create New Webhook" icon="plus">
+    Click "Add Webhook" and enter your endpoint URL.
+  </Step>
+  <Step title="Select Events" icon="filter">
+    Choose which events should trigger the webhook.
+  </Step>
+  <Step title="Test Configuration" icon="check-circle">
+    Send a test event to verify your endpoint receives notifications.
+  </Step>
+</Steps>
+
+### Webhook Configuration API
+
+Create and manage webhooks programmatically:
+
+<CodeGroup tabs="Python,Node.js,cURL">
+  ```python
+import requests
+
+# Create a new webhook
+webhook_config = {
+    'url': 'https://your-app.com/webhooks/pattrns',
+    'events': ['pattern.created', 'pattern.updated', 'data.imported'],
+    'secret': 'your_webhook_secret',
+    'active': True
+}
+
+response = requests.post(
+    'https://api.pattrns.com/webhooks',
+    json=webhook_config,
+    headers={'Authorization': 'Bearer your_api_key'}
+)
+
+webhook_id = response.json()['id']
+print(f"Created webhook: {webhook_id}")
+  ```
+  ```javascript
+const axios = require('axios');
+
+// Create webhook
+const webhookConfig = {
+  url: 'https://your-app.com/webhooks/pattrns',
+  events: ['pattern.created', 'pattern.updated'],
+  secret: 'your_webhook_secret',
+  active: true
+};
+
+const response = await axios.post(
+  'https://api.pattrns.com/webhooks',
+  webhookConfig,
+  {
+    headers: { 'Authorization': 'Bearer your_api_key' }
+  }
+);
+
+console.log(`Created webhook: ${response.data.id}`);
+  ```
+  ```bash
+curl -X POST \
+  'https://api.pattrns.com/webhooks' \
+  -H 'Authorization: Bearer your_api_key' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "url": "https://your-app.com/webhooks/pattrns",
+    "events": ["pattern.created", "pattern.updated"],
+    "secret": "your_webhook_secret",
+    "active": true
+  }'
+  ```
+</CodeGroup>
+
+## Event Types
+
+Pattrns sends notifications for various events in your workspace.
+
+<Tabs>
+  <Tab title="Pattern Events" icon="search">
+    Events related to pattern discovery and analysis.
+    
+    | Event | Description |
+    |-------|-------------|
+    | `pattern.created` | New pattern discovered |
+    | `pattern.updated` | Existing pattern modified |
+    | `pattern.deleted` | Pattern removed |
+    | `pattern.shared` | Pattern shared with team |
+  </Tab>
+  <Tab title="Data Events" icon="database">
+    Events related to data import and processing.
+    
+    | Event | Description |
+    |-------|-------------|
+    | `data.imported` | New data successfully imported |
+    | `data.processed` | Data processing completed |
+    | `data.failed` | Data import or processing failed |
+    | `dataset.created` | New dataset created |
+  </Tab>
+  <Tab title="User Events" icon="users">
+    Events related to user activities and collaboration.
+    
+    | Event | Description |
+    |-------|-------------|
+    | `user.joined` | New user joined workspace |
+    | `collaboration.started` | Collaboration session began |
+    | `comment.added` | Comment added to pattern |
+    | `share.created` | Resource shared externally |
+  </Tab>
+</Tabs>
+
+## Webhook Payloads
+
+Each webhook delivery contains a JSON payload with event details.
+
+### Example Payload Structure
+
+```json
+{
+  "event": "pattern.created",
+  "id": "evt_1234567890",
+  "timestamp": "2024-10-15T10:30:00Z",
+  "data": {
+    "pattern_id": "pat_abc123",
+    "pattern_name": "Customer Behavior Trend",
+    "confidence_score": 0.87,
+    "created_by": "user_456",
+    "workspace_id": "ws_xyz789"
+  },
+  "webhook_id": "wh_def456"
+}
+```
+
+<Callout kind="tip">Always validate the event type and data structure in your webhook handler to ensure compatibility with future changes.</Callout>
+
+## Security and Verification
+
+Secure your webhooks with signature verification to ensure authenticity.
+
+<ExpandableGroup>
+  <Expandable title="Signature Verification" default-open="true">
+    Pattrns signs each webhook payload with a secret key. Verify signatures to prevent spoofing.
+    
+    ```python
+import hmac
+import hashlib
+import json
+
+def verify_signature(payload, signature, secret):
+    expected_signature = hmac.new(
+        secret.encode(),
+        json.dumps(payload, separators=(',', ':')).encode(),
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(signature, expected_signature)
+
+# In your webhook handler
+payload = request.json()
+received_signature = request.headers.get('X-Pattrns-Signature')
+
+if verify_signature(payload, received_signature, 'your_webhook_secret'):
+    # Process the webhook
+    process_webhook(payload)
+else:
+    # Invalid signature - reject the request
+    abort(400, 'Invalid signature')
+    ```
+  </Expandable>
+  <Expandable title="Security Best Practices" default-open="false">
+    - Use HTTPS endpoints only
+    - Implement rate limiting
+    - Store webhook secrets securely
+    - Monitor webhook delivery failures
+    - Rotate secrets periodically
+  </Expandable>
+</ExpandableGroup>
+
+## Handling Webhook Deliveries
+
+Implement robust webhook handling to manage retries and failures.
+
+<Steps>
+  <Step title="Immediate Response" icon="zap">
+    Respond with HTTP 200 immediately to acknowledge receipt.
+  </Step>
+  <Step title="Asynchronous Processing" icon="clock">
+    Process webhook data asynchronously to avoid timeouts.
+  </Step>
+  <Step title="Error Handling" icon="alert-triangle">
+    Implement proper error handling and logging.
+  </Step>
+  <Step title="Retry Logic" icon="refresh-cw">
+    Handle failed deliveries with exponential backoff.
+  </Step>
+</Steps>
+
+### Webhook Handler Example
+
+```javascript
+const express = require('express');
+const crypto = require('crypto');
+const app = express();
+
+app.use(express.json());
+
+app.post('/webhooks/pattrns', (req, res) => {
+  // Respond immediately
+  res.status(200).send('OK');
+  
+  // Verify signature
+  const signature = req.headers['x-pattrns-signature'];
+  const isValid = verifySignature(req.body, signature);
+  
+  if (!isValid) {
+    console.error('Invalid webhook signature');
+    return;
+  }
+  
+  // Process asynchronously
+  setImmediate(() => {
+    handleWebhook(req.body);
+  });
+});
+
+function verifySignature(payload, signature) {
+  const expected = crypto
+    .createHmac('sha256', process.env.WEBHOOK_SECRET)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
+
+function handleWebhook(payload) {
+  switch (payload.event) {
+    case 'pattern.created':
+      console.log(`New pattern: ${payload.data.pattern_name}`);
+      // Update your application state
+      break;
+    case 'data.imported':
+      console.log(`Data imported: ${payload.data.dataset_name}`);
+      // Refresh your data cache
+      break;
+    default:
+      console.log(`Unhandled event: ${payload.event}`);
+  }
+}
+
+app.listen(3000);
+```
+
+## Monitoring and Debugging
+
+Track webhook performance and troubleshoot issues.
+
+<Columns cols={2}>
+  <Card title="Delivery Logs" icon="file-text" href="#logs">
+    View detailed logs of webhook deliveries and responses.
+  </Card>
+  <Card title="Retry Settings" icon="refresh-cw" href="#retries">
+    Configure automatic retry behavior for failed deliveries.
+  </Card>
+</Columns>
+
+<Callout kind="warning">Webhooks may be retried multiple times. Ensure your handlers are idempotent to avoid duplicate processing.</Callout>
